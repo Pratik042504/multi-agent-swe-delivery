@@ -160,6 +160,50 @@ Open **`http://localhost:8080`** to monitor agent swarms, inspect source files, 
 
 ---
 
+## ☁️ Deploying Backend to Render
+
+MAS-EDS is fully configured for deployment on [Render](https://render.com) using either **Render Blueprints (Infrastructure-as-Code)** or a **Standard Web Service / Docker Service**.
+
+### Option A: Render Blueprint (Recommended)
+1. Push your repository to GitHub.
+2. In the [Render Dashboard](https://dashboard.render.com), click **New +** > **Blueprint**.
+3. Select your repository. Render automatically reads [`render.yaml`](file:///C:/Users/lenovo/.gemini/antigravity/scratch/multi-agent-swe-delivery/render.yaml).
+4. Configure your secret environment variables:
+   - `GEMINI_API_KEY` or `OPENAI_API_KEY`
+5. Click **Apply**. Render will deploy the `mas-eds-backend` service.
+
+### Option B: Manual Web Service / Docker Deployment
+1. Click **New +** > **Web Service**.
+2. Select your repository.
+3. Configure the service:
+   - **Environment**: `Docker` (or `Python 3`)
+   - **Build Command** (Python): `pip install -r requirements.txt`
+   - **Start Command** (Python): `python -m src.server`
+   - **Health Check Path**: `/health`
+4. Add the required Environment Variables:
+   - `HOST`: `0.0.0.0`
+   - `PORT`: `8080` (or leave default, Render sets `$PORT` dynamically)
+   - `SANDBOX_MODE`: `local`
+   - `LLM_PROVIDER`: `gemini` (or `openai` / `heuristic`)
+   - `GEMINI_API_KEY`: `<your_gemini_api_key>`
+5. Deploy service. Render will monitor the `/health` endpoint and route traffic automatically.
+
+---
+
+## ⚡ Connecting Vercel Frontend to Render Backend
+
+You can host the UI on [Vercel](https://vercel.com) and the Python execution engine on Render:
+
+1. **Deploy Frontend on Vercel**:
+   Deploy the repository with `vercel` or via Git integration using [`vercel.json`](file:///C:/Users/lenovo/.gemini/antigravity/scratch/multi-agent-swe-delivery/vercel.json).
+2. **Connect to Render**:
+   - Open your deployed Vercel frontend in your browser.
+   - Click the **Backend Connection Badge** in the top navigation bar (`Backend: Localhost (Click to Change)`).
+   - Enter your Render backend URL (e.g. `https://mas-eds-backend.onrender.com`).
+   - The frontend will persist this configuration in `localStorage` and route all API calls (`/api/run`, `/api/sessions`, `/api/diff`, etc.) to your Render backend with full CORS support.
+
+---
+
 ## 🧪 Testing Suite & CI
 
 Run the complete test suite (unit tests, tools, security audits, TUI, and E2E self-healing pipeline):

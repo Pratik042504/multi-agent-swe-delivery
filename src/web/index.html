@@ -398,6 +398,7 @@
             <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 400;">| Autonomous SWE & Delivery Console</span>
         </div>
         <div class="header-meta">
+            <span id="backend-display" class="badge" style="cursor: pointer; background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue);" onclick="configureBackendUrl()" title="Click to configure Render backend URL">Backend: Connected</span>
             <a id="download-zip-btn" class="btn btn-download" style="display: none;" target="_blank">
                 <span>📦 Download ZIP</span>
             </a>
@@ -591,6 +592,40 @@
         let currentSessionId = null;
         let pollInterval = null;
         let sessionFiles = {};
+        let apiBase = localStorage.getItem('MAS_API_BASE') || '';
+
+        function updateBackendDisplay() {
+            const badge = document.getElementById('backend-display');
+            if (!badge) return;
+            if (apiBase) {
+                const hostPart = apiBase.replace(/^https?:\/\//, '').split('/')[0];
+                badge.textContent = `Backend: ${hostPart}`;
+                badge.style.borderColor = 'var(--accent-green)';
+                badge.style.color = 'var(--accent-green)';
+            } else {
+                badge.textContent = 'Backend: Local';
+            }
+        }
+
+        function configureBackendUrl() {
+            const current = localStorage.getItem('MAS_API_BASE') || '';
+            const next = prompt("Enter Render Backend URL (e.g. https://mas-eds-backend.onrender.com), or leave empty for local/same-origin:", current);
+            if (next !== null) {
+                apiBase = next.trim().replace(/\/+$/, '');
+                if (apiBase) {
+                    localStorage.setItem('MAS_API_BASE', apiBase);
+                } else {
+                    localStorage.removeItem('MAS_API_BASE');
+                }
+                updateBackendDisplay();
+            }
+        }
+
+        function apiUrl(path) {
+            return (apiBase ? apiBase : '') + path;
+        }
+
+        window.addEventListener('DOMContentLoaded', updateBackendDisplay);
 
         function setPreset(text) {
             document.getElementById('task-prompt').value = text;
@@ -626,7 +661,7 @@
             logToTerminal("ORCHESTRATOR", `Initiating swarm execution for prompt: "${prompt}"`);
 
             try {
-                const res = await fetch('/api/run', {
+                const res = await fetch(apiUrl('/api/run'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt, sandbox, max_retries: maxRetries, auto_approve: false })
@@ -637,7 +672,7 @@
 
                 // Setup download button
                 const dlBtn = document.getElementById('download-zip-btn');
-                dlBtn.href = `/api/download/${currentSessionId}`;
+                dlBtn.href = apiUrl(`/api/download/${currentSessionId}`);
                 dlBtn.style.display = 'inline-flex';
 
                 if (pollInterval) clearInterval(pollInterval);
@@ -652,7 +687,7 @@
             if (!currentSessionId) return;
 
             try {
-                const res = await fetch(`/api/sessions/${currentSessionId}`);
+                const res = await fetch(apiUrl(`/api/sessions/${currentSessionId}`));
                 if (!res.ok) return;
                 const state = await res.json();
 
@@ -784,7 +819,7 @@
         async function approveDelivery() {
             if (!currentSessionId) return;
             try {
-                const res = await fetch(`/api/sessions/${currentSessionId}/approve`, { method: 'POST' });
+                const res = await fetch(apiUrl(`/api/sessions/${currentSessionId}/approve`), { method: 'POST' });
                 const data = await res.json();
                 document.getElementById('approval-banner-container').innerHTML = `
                     <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-green); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; color: var(--accent-green); font-weight: 600;">
@@ -811,7 +846,7 @@
             logToTerminal("USER", `Revision requested: "${feedback}"`);
 
             try {
-                const res = await fetch(`/api/sessions/${currentSessionId}/revise`, {
+                const res = await fetch(apiUrl(`/api/sessions/${currentSessionId}/revise`), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ feedback })
@@ -827,7 +862,7 @@
         async function fetchFiles() {
             if (!currentSessionId) return;
             try {
-                const res = await fetch(`/api/files/${currentSessionId}`);
+                const res = await fetch(apiUrl(`/api/files/${currentSessionId}`));
                 if (!res.ok) return;
                 sessionFiles = await res.json();
 
@@ -858,7 +893,7 @@
             if (!currentSessionId) return;
             const diffPane = document.getElementById('diff-output');
             try {
-                const res = await fetch(`/api/diff/${currentSessionId}`);
+                const res = await fetch(apiUrl(`/api/diff/${currentSessionId}`));
                 if (!res.ok) {
                     diffPane.textContent = "// No diff available yet.";
                     return;

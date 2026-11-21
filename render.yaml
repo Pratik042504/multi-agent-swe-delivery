@@ -1,0 +1,30 @@
+# Render Blueprint Specification for MAS-EDS Backend
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: mas-eds-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m src.server
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: HOST
+        value: 0.0.0.0
+      - key: SANDBOX_MODE
+        value: local
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: MAX_BUDGET_USD
+        value: "5.0"
+      - key: WORKSPACE_BASE_DIR
+        value: ./workspaces

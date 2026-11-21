@@ -7,7 +7,8 @@ import io
 import zipfile
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from datetime import datetime, timezone
 
 from .config import settings, get_workspace_dir
 from .graph import create_delivery_graph
@@ -233,7 +234,17 @@ class SwarmHTTPHandler(SimpleHTTPRequestHandler):
                 self._send_json(404, {"error": "Workspace not found"})
                 return
 
-        # 6. Frontend: Serve Dashboard HTML & Favicon
+        # 6. Health Check Probes (Render, Kubernetes, Cloud Run)
+        elif clean_path in ("/health", "/api/health"):
+            self._send_json(200, {
+                "status": "healthy",
+                "service": "MAS-EDS Backend",
+                "active_sessions": len(active_sessions),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            return
+
+        # 7. Frontend: Serve Dashboard HTML & Favicon
         elif clean_path in ("/", "/index.html", ""):
             index_path = WEB_DIR / "index.html"
             if index_path.exists():
@@ -347,9 +358,25 @@ class SwarmHTTPHandler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
-def start_server(port: int = 8080, host: str = "127.0.0.1"):
+def start_server(port: Optional[int] = None, host: Optional[str] = None):
     """Starts the MAS-EDS server connecting Frontend and Backend with automatic port recovery."""
-    candidate_ports = [port, 8080, 5000, 3000, 8081, 8888]
+    env_port = os.getenv("PORT")
+    if port is None:
+        port = int(env_port) if env_port else 8080
+
+    if host is None:
+        # On Render, Heroku, Cloud Run, or Docker, bind to 0.0.0.0
+        if os.getenv("RENDER") or os.getenv("PORT") or os.getenv("DOCKER"):
+            host = "0.0.0.0"
+        else:
+            host = os.getenv("HOST", "127.0.0.1")
+
+    # In cloud environments with assigned PORT, prioritize the specified port
+    if os.getenv("RENDER") or os.getenv("PORT"):
+        candidate_ports = [port]
+    else:
+        candidate_ports = [port, 8080, 5000, 3000, 8081, 8888]
+
     # Remove duplicates preserving order
     seen = set()
     candidate_ports = [p for p in candidate_ports if not (p in seen or seen.add(p))]
@@ -372,8 +399,10 @@ def start_server(port: int = 8080, host: str = "127.0.0.1"):
 
     print(f"\n========================================================")
     print(f"⚡ MAS-EDS Web Console & API Server Running")
-    print(f"Connected Frontend: http://localhost:{selected_port}")
-    print(f"Connected API:      http://localhost:{selected_port}/api")
+    print(f"Host:               {host}")
+    print(f"Connected Frontend: http://{host}:{selected_port}")
+    print(f"Connected API:      http://{host}:{selected_port}/api")
+    print(f"Health Probe:       http://{host}:{selected_port}/health")
     print(f"========================================================\n", flush=True)
     try:
         httpd.serve_forever()
@@ -382,5 +411,5 @@ def start_server(port: int = 8080, host: str = "127.0.0.1"):
         httpd.server_close()
 
 if __name__ == "__main__":
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
-    start_server(port=port)
+    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else None
+    start_server(port=port_arg)
