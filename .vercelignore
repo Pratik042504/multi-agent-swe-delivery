@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+env
+__pycache__
+*.pyc
+.pytest_cache
+.swe_cache
+workspaces
+docker
+tests
+.coverage
+htmlcov
+*.zip
+*.db

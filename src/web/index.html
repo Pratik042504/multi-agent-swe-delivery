@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAS-EDS | Multi-Agent Software Engineering & Delivery Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2234;
+            --border-color: #273549;
+            --accent-cyan: #00f2fe;
+            --accent-blue: #4facfe;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header */
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.85rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.25rem;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-meta {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+        .badge {
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-ready { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .badge-running { background: rgba(0, 242, 254, 0.15); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); animation: pulse 2s infinite; }
+        .badge-waiting { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+        /* Main Container */
+        .container {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            flex: 1;
+            height: calc(100vh - 65px);
+            overflow: hidden;
+        }
+
+        /* Left Sidebar: Controls & Inputs */
+        aside {
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.1rem;
+            overflow-y: auto;
+        }
+        .section-title {
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        textarea {
+            width: 100%;
+            height: 110px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            padding: 0.75rem;
+            font-family: inherit;
+            font-size: 0.875rem;
+            resize: vertical;
+        }
+        textarea:focus { outline: none; border-color: var(--accent-cyan); }
+
+        .btn {
+            background: linear-gradient(135deg, #00f2fe, #4facfe);
+            color: #04101c;
+            border: none;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-approve {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+        .btn-revise {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #1e1b4b;
+        }
+        .btn-download {
+            background: var(--bg-card);
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+        .btn-download:hover { background: rgba(0, 242, 254, 0.1); }
+
+        .quick-presets {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .preset-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            text-align: left;
+            font-size: 0.775rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .preset-btn:hover { border-color: var(--accent-cyan); color: var(--text-main); }
+
+        /* Right Panel: Swarm Visualizer & Tabs */
+        main {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-primary);
+        }
+
+        /* Swarm Node Pipeline */
+        .pipeline-bar {
+            padding: 1rem 2rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow-x: auto;
+            gap: 1rem;
+        }
+        .pipeline-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+            min-width: 90px;
+            position: relative;
+        }
+        .node-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            transition: all 0.3s;
+        }
+        .node-label { font-size: 0.725rem; font-weight: 500; color: var(--text-muted); }
+        
+        .pipeline-node.active .node-circle {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 12px var(--accent-cyan);
+            transform: scale(1.1);
+        }
+        .pipeline-node.completed .node-circle {
+            border-color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+
+        .pipeline-node.failed .node-circle {
+            border-color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+        }
+
+        /* Tab Navigation */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            padding: 0 2rem;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.85rem 1.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: var(--accent-cyan);
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        /* Content Views */
+        .tab-content {
+            flex: 1;
+            padding: 1.25rem 2rem;
+            overflow-y: auto;
+            display: none;
+        }
+        .tab-content.active { display: block; }
+
+        /* Cards & Grid */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.25rem;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .card-title { font-size: 0.95rem; font-weight: 600; }
+
+        /* Code Viewer */
+        .file-browser {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 1rem;
+            height: calc(100vh - 280px);
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        .file-list {
+            background: rgba(0,0,0,0.2);
+            border-right: 1px solid var(--border-color);
+            padding: 0.75rem;
+            overflow-y: auto;
+        }
+        .file-item {
+            padding: 0.45rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.825rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-item:hover, .file-item.active {
+            background: rgba(0, 242, 254, 0.1);
+            color: var(--accent-cyan);
+        }
+        .code-pane {
+            padding: 1rem;
+            overflow: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #d1d5db;
+            white-space: pre-wrap;
+        }
+
+        /* Diff Viewer */
+        .diff-box {
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.825rem;
+            height: calc(100vh - 280px);
+            overflow: auto;
+            white-space: pre;
+            line-height: 1.45;
+        }
+        .diff-line-add { color: #10b981; background: rgba(16, 185, 129, 0.08); display: block; }
+        .diff-line-del { color: #ef4444; background: rgba(239, 68, 68, 0.08); display: block; }
+        .diff-line-chunk { color: #00f2fe; background: rgba(0, 242, 254, 0.05); font-weight: 600; display: block; }
+        .diff-line-file { color: #f59e0b; font-weight: 700; display: block; margin-top: 0.5rem; }
+
+        /* Terminal Console */
+        .terminal-box {
+            background: #000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.825rem;
+            height: calc(100vh - 280px);
+            overflow-y: auto;
+            color: #10b981;
+        }
+        .log-entry { margin-bottom: 0.5rem; line-height: 1.4; }
+        .log-time { color: #6b7280; margin-right: 0.5rem; }
+        .log-agent { color: var(--accent-cyan); font-weight: 600; margin-right: 0.5rem; }
+
+        /* Approval Banner */
+        .approval-banner {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.12));
+            border: 1px solid var(--accent-yellow);
+            border-radius: 10px;
+            padding: 1.25rem 1.75rem;
+            margin-bottom: 1.25rem;
+        }
+        .banner-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .revision-box {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px dashed rgba(245, 158, 11, 0.3);
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+        .revision-input {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.6rem 0.85rem;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+        .revision-input:focus { outline: none; border-color: var(--accent-yellow); }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <span>⚡ MAS-EDS</span>
+            <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 400;">| Autonomous SWE & Delivery Console</span>
+        </div>
+        <div class="header-meta">
+            <a id="download-zip-btn" class="btn btn-download" style="display: none;" target="_blank">
+                <span>📦 Download ZIP</span>
+            </a>
+            <span id="system-status-badge" class="badge badge-ready">Swarm Idle</span>
+            <span id="session-display" style="color: var(--text-muted); font-family: monospace;">Session: None</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar Controls -->
+        <aside>
+            <div>
+                <div class="section-title">Task Specification</div>
+                <textarea id="task-prompt" placeholder="Describe the software system, microservice, or API you want the swarm to build and deliver...">Build a fullstack Task Manager service with FastAPI backend, SQLite storage, JWT authentication, and interactive frontend</textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                <div>
+                    <div class="section-title">Sandbox Mode</div>
+                    <select id="sandbox-select" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 6px;">
+                        <option value="local">Local Sandbox</option>
+                        <option value="docker">Docker Container</option>
+                    </select>
+                </div>
+                <div>
+                    <div class="section-title">Max Retries</div>
+                    <input type="number" id="max-retries" value="3" min="1" max="5" style="width: 100%; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem; border-radius: 6px;">
+                </div>
+            </div>
+
+            <button id="start-btn" class="btn" onclick="startExecution()">
+                <span>🚀 Launch Autonomous Swarm</span>
+            </button>
+
+            <div>
+                <div class="section-title">Quick Presets</div>
+                <div class="quick-presets">
+                    <button class="preset-btn" onclick="setPreset('Build a fullstack Task Manager service with FastAPI backend, SQLite storage, JWT authentication, and interactive frontend')">🌐 Fullstack FastAPI + Frontend</button>
+                    <button class="preset-btn" onclick="setPreset('Build an asynchronous Key-Value cache with TTL expiration, memory eviction, and metrics')">⚡ High-Performance Async Cache</button>
+                    <button class="preset-btn" onclick="setPreset('Build a resilient webhook dispatcher with exponential backoff and HMAC-SHA256 verification')">🔒 Webhook Dispatcher & HMAC</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Content & Live Visualizer -->
+        <main>
+            <!-- Pipeline Progress Bar -->
+            <div class="pipeline-bar">
+                <div class="pipeline-node" id="node-product">
+                    <div class="node-circle">📋</div>
+                    <span class="node-label">1. Product</span>
+                </div>
+                <div class="pipeline-node" id="node-architect">
+                    <div class="node-circle">📐</div>
+                    <span class="node-label">2. Architect</span>
+                </div>
+                <div class="pipeline-node" id="node-coder">
+                    <div class="node-circle">💻</div>
+                    <span class="node-label">3. Coder</span>
+                </div>
+                <div class="pipeline-node" id="node-qa">
+                    <div class="node-circle">🧪</div>
+                    <span class="node-label">4. QA Sandbox</span>
+                </div>
+                <div class="pipeline-node" id="node-security">
+                    <div class="node-circle">🛡️</div>
+                    <span class="node-label">5. Security</span>
+                </div>
+                <div class="pipeline-node" id="node-devops">
+                    <div class="node-circle">🚀</div>
+                    <span class="node-label">6. DevOps</span>
+                </div>
+                <div class="pipeline-node" id="node-gate">
+                    <div class="node-circle">✋</div>
+                    <span class="node-label">7. Delivery</span>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('overview')">Overview & Metrics</button>
+                <button class="tab-btn" onclick="switchTab('code')">Code Explorer</button>
+                <button class="tab-btn" onclick="switchTab('diff')">Git Diff Viewer</button>
+                <button class="tab-btn" onclick="switchTab('terminal')">Agent Audit Terminal</button>
+                <button class="tab-btn" onclick="switchTab('delivery')">Release Manifest & CI/CD</button>
+            </div>
+
+            <!-- Tab 1: Overview -->
+            <div id="tab-overview" class="tab-content active">
+                <div id="approval-banner-container"></div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">📋 Product Specification (PRD)</span>
+                            <span id="prd-badge" class="badge badge-ready">Waiting</span>
+                        </div>
+                        <div id="prd-content" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                            Submit a specification to initiate requirement breakdown.
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">📐 System Architecture</span>
+                            <span id="arch-badge" class="badge badge-ready">Pending</span>
+                        </div>
+                        <div id="arch-content" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                            Architecture components, dependency graph, and entrypoint definition.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">🧪 QA Sandbox Verification</span>
+                            <span id="qa-badge" class="badge badge-ready">Idle</span>
+                        </div>
+                        <div id="qa-content" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                            Sandboxed test execution report with failure trace diagnostics.
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title">🛡️ Security & AST Gate</span>
+                            <span id="sec-badge" class="badge badge-ready">Idle</span>
+                        </div>
+                        <div id="sec-content" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                            AST static analysis, dangerous built-in audit, and quality score.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Code Explorer -->
+            <div id="tab-code" class="tab-content">
+                <div class="file-browser">
+                    <div class="file-list" id="file-list-pane">
+                        <div style="padding: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">No files generated yet</div>
+                    </div>
+                    <div class="code-pane" id="code-content-pane">// Select a file from the explorer pane to inspect source code.</div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Git Diff Viewer -->
+            <div id="tab-diff" class="tab-content">
+                <div class="card" style="margin-bottom: 1rem;">
+                    <div class="card-header">
+                        <span class="card-title">🔍 Git Commit Patch & Unified Diff</span>
+                        <button class="btn btn-download" onclick="fetchDiff()" style="padding: 0.25rem 0.6rem;">Refresh Diff</button>
+                    </div>
+                    <div class="diff-box" id="diff-output">// Git diff will render here once the swarm commits to the repository.</div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Terminal Console -->
+            <div id="tab-terminal" class="tab-content">
+                <div class="terminal-box" id="terminal-output">
+                    <div class="log-entry">
+                        <span class="log-time">[00:00:00]</span>
+                        <span class="log-agent">[SYSTEM]</span>
+                        <span>Multi-Agent Software Engineering Swarm Console Ready.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Release Manifest -->
+            <div id="tab-delivery" class="tab-content">
+                <div class="card" style="margin-bottom: 1rem;">
+                    <div class="card-header">
+                        <span class="card-title">📦 Git & Deployment Summary</span>
+                        <span id="delivery-badge" class="badge badge-ready">Pending</span>
+                    </div>
+                    <div id="delivery-summary" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;">
+                        Commit hash, feature branch, and Docker container delivery payload.
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">⚙️ GitHub Actions CI/CD Pipeline Preview</span>
+                    </div>
+                    <pre id="cicd-preview" style="font-family: 'Fira Code', monospace; font-size: 0.8rem; background: #000; padding: 1rem; border-radius: 6px; overflow-x: auto; color: #a5f3fc;"># CI/CD Pipeline will appear here once generated</pre>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let pollInterval = null;
+        let sessionFiles = {};
+
+        function setPreset(text) {
+            document.getElementById('task-prompt').value = text;
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
+
+            if (tabId === 'diff') {
+                fetchDiff();
+            }
+        }
+
+        async function startExecution() {
+            const prompt = document.getElementById('task-prompt').value.trim();
+            const sandbox = document.getElementById('sandbox-select').value;
+            const maxRetries = parseInt(document.getElementById('max-retries').value) || 3;
+
+            if (!prompt) {
+                alert("Please enter a software engineering task.");
+                return;
+            }
+
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('system-status-badge').className = "badge badge-running";
+            document.getElementById('system-status-badge').textContent = "Swarm Running";
+            resetPipelineUI();
+
+            logToTerminal("ORCHESTRATOR", `Initiating swarm execution for prompt: "${prompt}"`);
+
+            try {
+                const res = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt, sandbox, max_retries: maxRetries, auto_approve: false })
+                });
+                const data = await res.json();
+                currentSessionId = data.session_id;
+                document.getElementById('session-display').textContent = `Session: ${currentSessionId}`;
+
+                // Setup download button
+                const dlBtn = document.getElementById('download-zip-btn');
+                dlBtn.href = `/api/download/${currentSessionId}`;
+                dlBtn.style.display = 'inline-flex';
+
+                if (pollInterval) clearInterval(pollInterval);
+                pollInterval = setInterval(pollSessionStatus, 1500);
+            } catch (err) {
+                logToTerminal("ERROR", `Failed to start session: ${err.message}`);
+                document.getElementById('start-btn').disabled = false;
+            }
+        }
+
+        async function pollSessionStatus() {
+            if (!currentSessionId) return;
+
+            try {
+                const res = await fetch(`/api/sessions/${currentSessionId}`);
+                if (!res.ok) return;
+                const state = await res.json();
+
+                updateUIFromState(state);
+
+                if (state.status === 'delivered' || state.status === 'pending_human_signoff' || state.status.includes('failed')) {
+                    clearInterval(pollInterval);
+                    document.getElementById('start-btn').disabled = false;
+                    fetchFiles();
+                    fetchDiff();
+                }
+            } catch (e) {
+                console.error("Polling error:", e);
+            }
+        }
+
+        function updateUIFromState(state) {
+            // Pipeline Nodes
+            if (state.prd) setNodeStatus('node-product', 'completed');
+            if (state.architecture) setNodeStatus('node-architect', 'completed');
+            if (state.source_files && Object.keys(state.source_files).length > 0) setNodeStatus('node-coder', 'completed');
+            
+            if (state.test_results) {
+                setNodeStatus('node-qa', state.test_results.passed ? 'completed' : 'failed');
+            }
+            if (state.security_review) {
+                setNodeStatus('node-security', state.security_review.approved ? 'completed' : 'failed');
+            }
+            if (state.delivery_artifacts) {
+                setNodeStatus('node-devops', 'completed');
+            }
+            if (state.status === 'delivered') {
+                setNodeStatus('node-gate', 'completed');
+                document.getElementById('system-status-badge').className = "badge badge-ready";
+                document.getElementById('system-status-badge').textContent = "Delivered";
+            } else if (state.status === 'pending_human_signoff') {
+                setNodeStatus('node-gate', 'active');
+                document.getElementById('system-status-badge').className = "badge badge-waiting";
+                document.getElementById('system-status-badge').textContent = "Sign-Off Needed";
+                showApprovalBanner();
+            }
+
+            // Cards Data
+            if (state.prd) {
+                document.getElementById('prd-badge').textContent = "PRD Ready";
+                document.getElementById('prd-content').innerHTML = `
+                    <strong>${state.prd.title || 'Product Spec'}</strong><br>
+                    ${state.prd.summary || ''}<br><br>
+                    <strong>Features:</strong><br>
+                    ${(state.prd.features || []).map(f => `• <b>${f.name}</b>: ${f.description}`).join('<br>')}
+                `;
+            }
+
+            if (state.architecture) {
+                document.getElementById('arch-badge').textContent = "Designed";
+                document.getElementById('arch-content').innerHTML = `
+                    <strong>Overview:</strong> ${state.architecture.system_overview || 'Modular architecture.'}<br><br>
+                    <strong>Entrypoint:</strong> <code>${state.architecture.execution_entrypoint || 'main.py'}</code><br>
+                    <strong>Planned Sources:</strong> ${(state.architecture.source_files_planned || []).join(', ')}<br>
+                    <strong>Planned Tests:</strong> ${(state.architecture.test_files_planned || []).join(', ')}
+                `;
+            }
+
+            if (state.test_results) {
+                const qa = state.test_results;
+                document.getElementById('qa-badge').textContent = qa.passed ? `${qa.passed_tests}/${qa.total_tests} Passed` : "Tests Failed";
+                document.getElementById('qa-badge').className = qa.passed ? "badge badge-ready" : "badge badge-waiting";
+                document.getElementById('qa-content').innerHTML = `
+                    <strong>Status:</strong> ${qa.summary}<br>
+                    <strong>Total:</strong> ${qa.total_tests} | <strong>Passed:</strong> ${qa.passed_tests} | <strong>Failed:</strong> ${qa.failed_tests}
+                `;
+            }
+
+            if (state.security_review) {
+                const sec = state.security_review;
+                document.getElementById('sec-badge').textContent = `${sec.quality_score}/10.0`;
+                document.getElementById('sec-badge').className = sec.approved ? "badge badge-ready" : "badge badge-waiting";
+                document.getElementById('sec-content').innerHTML = `
+                    <strong>Score:</strong> ${sec.quality_score}/10.0<br>
+                    <strong>Audit:</strong> ${sec.summary}<br>
+                    ${sec.findings && sec.findings.length ? `<span style="color:var(--accent-yellow)">Findings: ${sec.findings.length} issues identified</span>` : '<span style="color:var(--accent-green)">Zero critical vulnerabilities detected</span>'}
+                `;
+            }
+
+            if (state.delivery_artifacts) {
+                const d = state.delivery_artifacts;
+                document.getElementById('delivery-badge').textContent = "Packaged";
+                document.getElementById('delivery-summary').innerHTML = `
+                    <pre style="white-space: pre-wrap; font-family: inherit;">${d.release_notes || 'Artifacts ready.'}</pre>
+                `;
+                if (d.github_workflow) {
+                    document.getElementById('cicd-preview').textContent = d.github_workflow;
+                }
+            }
+
+            // Sync Audit Logs
+            if (state.audit_log) {
+                state.audit_log.forEach(item => {
+                    logToTerminal(item.agent || "AGENT", `${item.event}: ${item.summary}`);
+                });
+            }
+        }
+
+        function showApprovalBanner() {
+            const container = document.getElementById('approval-banner-container');
+            container.innerHTML = `
+                <div class="approval-banner">
+                    <div class="banner-top">
+                        <div>
+                            <h4 style="color: var(--accent-yellow); font-size: 1.05rem;">✋ Human-in-the-Loop Delivery Gate Triggered</h4>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                Tests passed & security AST checks approved. Approve for final release or request a revision below.
+                            </p>
+                        </div>
+                        <button class="btn btn-approve" onclick="approveDelivery()">
+                            <span>✅ Approve & Release Deployment</span>
+                        </button>
+                    </div>
+                    <div class="revision-box">
+                        <input id="revision-feedback-input" class="revision-input" placeholder="Want changes? Type feedback for the Coder agent (e.g., 'Add a /metrics endpoint and error handling')">
+                        <button class="btn btn-revise" onclick="submitRevision()">
+                            <span>🔄 Request Revision</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function approveDelivery() {
+            if (!currentSessionId) return;
+            try {
+                const res = await fetch(`/api/sessions/${currentSessionId}/approve`, { method: 'POST' });
+                const data = await res.json();
+                document.getElementById('approval-banner-container').innerHTML = `
+                    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid var(--accent-green); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; color: var(--accent-green); font-weight: 600;">
+                        ✨ Release Approved! System deployed and delivered successfully.
+                    </div>
+                `;
+                setNodeStatus('node-gate', 'completed');
+                document.getElementById('system-status-badge').className = "badge badge-ready";
+                document.getElementById('system-status-badge').textContent = "Delivered";
+            } catch (e) {
+                alert("Approval failed: " + e.message);
+            }
+        }
+
+        async function submitRevision() {
+            const feedback = document.getElementById('revision-feedback-input').value.trim();
+            if (!feedback) {
+                alert("Please describe the revision you want the Coder Agent to make.");
+                return;
+            }
+
+            document.getElementById('system-status-badge').className = "badge badge-running";
+            document.getElementById('system-status-badge').textContent = "Revising Code...";
+            logToTerminal("USER", `Revision requested: "${feedback}"`);
+
+            try {
+                const res = await fetch(`/api/sessions/${currentSessionId}/revise`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback })
+                });
+                const data = await res.json();
+                if (pollInterval) clearInterval(pollInterval);
+                pollInterval = setInterval(pollSessionStatus, 1500);
+            } catch (e) {
+                alert("Revision request failed: " + e.message);
+            }
+        }
+
+        async function fetchFiles() {
+            if (!currentSessionId) return;
+            try {
+                const res = await fetch(`/api/files/${currentSessionId}`);
+                if (!res.ok) return;
+                sessionFiles = await res.json();
+
+                const listPane = document.getElementById('file-list-pane');
+                listPane.innerHTML = '';
+
+                const filenames = Object.keys(sessionFiles);
+                if (filenames.length === 0) {
+                    listPane.innerHTML = '<div style="padding: 0.5rem; color: var(--text-muted);">No files generated</div>';
+                    return;
+                }
+
+                filenames.forEach((name, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'file-item' + (index === 0 ? ' active' : '');
+                    item.textContent = name;
+                    item.onclick = () => selectFile(name, item);
+                    listPane.appendChild(item);
+                });
+
+                selectFile(filenames[0]);
+            } catch (e) {
+                console.error("Error fetching files:", e);
+            }
+        }
+
+        async function fetchDiff() {
+            if (!currentSessionId) return;
+            const diffPane = document.getElementById('diff-output');
+            try {
+                const res = await fetch(`/api/diff/${currentSessionId}`);
+                if (!res.ok) {
+                    diffPane.textContent = "// No diff available yet.";
+                    return;
+                }
+                const data = await res.json();
+                const rawDiff = data.diff || "// Clean working tree - no changes.";
+                
+                // Colorize diff lines
+                const colored = rawDiff.split('\n').map(line => {
+                    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff --git')) {
+                        return `<span class="diff-line-file">${escapeHtml(line)}</span>`;
+                    } else if (line.startsWith('@@')) {
+                        return `<span class="diff-line-chunk">${escapeHtml(line)}</span>`;
+                    } else if (line.startsWith('+')) {
+                        return `<span class="diff-line-add">${escapeHtml(line)}</span>`;
+                    } else if (line.startsWith('-')) {
+                        return `<span class="diff-line-del">${escapeHtml(line)}</span>`;
+                    }
+                    return escapeHtml(line);
+                }).join('\n');
+
+                diffPane.innerHTML = colored;
+            } catch (e) {
+                diffPane.textContent = "// Failed to load diff: " + e.message;
+            }
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function selectFile(filename, element) {
+            if (element) {
+                document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+                element.classList.add('active');
+            }
+            const content = sessionFiles[filename] || '// Empty file';
+            document.getElementById('code-content-pane').textContent = content;
+        }
+
+        function setNodeStatus(nodeId, status) {
+            const el = document.getElementById(nodeId);
+            if (!el) return;
+            el.className = `pipeline-node ${status}`;
+        }
+
+        function resetPipelineUI() {
+            document.querySelectorAll('.pipeline-node').forEach(n => n.className = 'pipeline-node');
+            document.getElementById('approval-banner-container').innerHTML = '';
+        }
+
+        function logToTerminal(agent, message) {
+            const term = document.getElementById('terminal-output');
+            const now = new Date().toTimeString().split(' ')[0];
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${now}]</span><span class="log-agent">[${agent}]</span><span>${message}</span>`;
+            term.appendChild(entry);
+            term.scrollTop = term.scrollHeight;
+        }
+    </script>
+</body>
+</html>

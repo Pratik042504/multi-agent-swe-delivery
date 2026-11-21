@@ -1,0 +1,40 @@
+# Multi-Agent Software Engineering & Delivery System (MAS-EDS)
+Dependencies and package configuration
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mas-delivery"
+version = "0.1.0"
+description = "Autonomous Multi-Agent Software Engineering & Continuous Delivery System"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.2.20",
+    "langchain-core>=0.3.0",
+    "langchain-google-genai>=2.0.0",
+    "langchain-openai>=0.2.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "typer>=0.12.3",
+    "rich>=13.7.1",
+    "python-dotenv>=1.0.1",
+    "docker>=7.0.0",
+    "gitpython>=3.1.43",
+    "pytest>=8.1.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+    "bandit>=1.7.8",
+    "pip-audit>=2.7.0"
+]
+
+[project.scripts]
+swe = "src.cli:app"
+mas = "src.cli:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
