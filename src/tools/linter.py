@@ -62,11 +62,11 @@ def run_fast_linter(workspace_path: Path, files: Optional[List[str]] = None) -> 
             execution_time_ms=round(elapsed, 2)
         )
 
-    # 1. Attempt running Ruff if installed
+    # 1. Attempt running Ruff if installed (focus on syntax, import, and fatal runtime errors)
     ruff_bin = shutil.which("ruff")
     if ruff_bin:
         try:
-            cmd = [ruff_bin, "check", "--output-format=json"] + [str(p) for p in target_paths]
+            cmd = [ruff_bin, "check", "--select=E9,F63,F7,F82", "--output-format=json"] + [str(p) for p in target_paths]
             proc = subprocess.run(
                 cmd,
                 cwd=str(workspace_path),
