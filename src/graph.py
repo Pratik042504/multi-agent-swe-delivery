@@ -107,165 +107,156 @@ class SqliteCheckpointer:
         finally:
             conn.close()
 
-# Try LangGraph imports; otherwise provide fully compatible in-memory StateGraph engine
-try:
-    from langgraph.graph import StateGraph, END
-    try:
-        from langgraph.checkpoint.sqlite import SqliteSaver
-    except ImportError:
-        SqliteSaver = None
-except ImportError:
-    END = "__end__"
-    SqliteSaver = None
+END = "__end__"
 
-    class StateGraph:
-        """Lightweight StateGraph engine with checkpointing and interruption gates."""
+class StateGraph:
+    """Lightweight StateGraph engine with checkpointing and interruption gates."""
 
-        def __init__(self, state_schema):
-            self.state_schema = state_schema
-            self.nodes: Dict[str, Any] = {}
-            self.edges: Dict[str, str] = {}
-            self.conditional_edges: Dict[str, Any] = {}
-            self.entry_point: Optional[str] = None
+    def __init__(self, state_schema):
+        self.state_schema = state_schema
+        self.nodes: Dict[str, Any] = {}
+        self.edges: Dict[str, str] = {}
+        self.conditional_edges: Dict[str, Any] = {}
+        self.entry_point: Optional[str] = None
 
-        def add_node(self, name: str, func: Any):
-            self.nodes[name] = func
+    def add_node(self, name: str, func: Any):
+        self.nodes[name] = func
 
-        def set_entry_point(self, name: str):
-            self.entry_point = name
+    def set_entry_point(self, name: str):
+        self.entry_point = name
 
-        def add_edge(self, from_node: str, to_node: str):
-            self.edges[from_node] = to_node
+    def add_edge(self, from_node: str, to_node: str):
+        self.edges[from_node] = to_node
 
-        def add_conditional_edges(self, from_node: str, router_func: Any, path_map: Dict[str, str]):
-            self.conditional_edges[from_node] = (router_func, path_map)
+    def add_conditional_edges(self, from_node: str, router_func: Any, path_map: Dict[str, str]):
+        self.conditional_edges[from_node] = (router_func, path_map)
 
-        def compile(self, checkpointer=None, interrupt_before: Optional[List[str]] = None):
-            class CompiledGraph:
-                def __init__(self, parent, checkpointer, interrupt_before):
-                    self.parent = parent
-                    self.checkpointer = checkpointer
-                    self.interrupt_before = interrupt_before or []
+    def compile(self, checkpointer=None, interrupt_before: Optional[List[str]] = None):
+        class CompiledGraph:
+            def __init__(self, parent, checkpointer, interrupt_before):
+                self.parent = parent
+                self.checkpointer = checkpointer
+                self.interrupt_before = interrupt_before or []
 
-                def invoke(self, initial_state: dict, config: Optional[dict] = None) -> dict:
-                    cfg = config or {}
-                    thread_id = (
-                        cfg.get("configurable", {}).get("thread_id")
-                        or initial_state.get("thread_id")
-                        or initial_state.get("session_id", "default_thread")
-                    )
+            def invoke(self, initial_state: dict, config: Optional[dict] = None) -> dict:
+                cfg = config or {}
+                thread_id = (
+                    cfg.get("configurable", {}).get("thread_id")
+                    or initial_state.get("thread_id")
+                    or initial_state.get("session_id", "default_thread")
+                )
 
-                    # Resume from checkpointer if existing state is stored
-                    state = dict(initial_state)
-                    if self.checkpointer:
-                        saved = self.checkpointer.get({"configurable": {"thread_id": thread_id}})
-                        if saved:
-                            saved_next = saved.get("_next_node")
-                            is_explicit_resume = bool(
-                                state.get("_resume")
-                                or cfg.get("configurable", {}).get("resume")
-                            )
-
-                            # Resume if explicitly requested, or if saved state is in an interrupted/in-flight state
-                            if (saved_next and saved_next != END) or is_explicit_resume:
-                                merged = dict(saved)
-                                for k, v in state.items():
-                                    if k == "status" and v in ("in_progress", "initialized") and saved.get("status"):
-                                        continue
-                                    if v not in (None, "", [], {}):
-                                        merged[k] = v
-                                state = merged
-
-                    state["thread_id"] = thread_id
-                    run_id = state.get("run_id") or state.get("session_id") or thread_id
-                    active_run_id.set(run_id)
-
-                    current_node = state.get("_next_node") or self.parent.entry_point
-                    max_steps = 50
-                    steps = 0
-
-                    tracker = TelemetryTracker.get_tracker(run_id)
-                    on_step = cfg.get("on_step")
-
-                    while current_node and current_node != END and steps < max_steps:
-                        steps += 1
-
-                        # Human-in-the-Loop Interruption Check
-                        if current_node in self.interrupt_before:
-                            passed_interrupts = state.get("_passed_interrupts", [])
-                            if current_node not in passed_interrupts:
-                                state["_passed_interrupts"] = passed_interrupts + [current_node]
-                                state["_next_node"] = current_node
-                                state["status"] = f"interrupted_before_{current_node}"
-                                if self.checkpointer:
-                                    self.checkpointer.put({"configurable": {"thread_id": thread_id}}, state)
-                                tracker.record_transition(
-                                    from_node="orchestrator",
-                                    to_node=f"interrupt:{current_node}",
-                                    metadata={"reason": "HITL gate triggered"}
-                                )
-                                if on_step:
-                                    try:
-                                        on_step(current_node, "interrupt", state)
-                                    except Exception:
-                                        pass
-                                return state
-
-                        # Notify start
-                        if on_step:
-                            try:
-                                on_step(current_node, "start", state)
-                            except Exception:
-                                pass
-
-                        # Execute node function
-                        fn = self.parent.nodes[current_node]
-                        prev_node = current_node
-                        updates = fn(state)
-                        if updates:
-                            state.update(updates)
-
-                        state["cost_usd"] = tracker.cumulative_cost_usd
-                        state["token_usage"] = {
-                            "prompt_tokens": tracker.total_prompt_tokens,
-                            "completion_tokens": tracker.total_completion_tokens,
-                            "total_tokens": tracker.total_prompt_tokens + tracker.total_completion_tokens
-                        }
-
-                        if on_step:
-                            try:
-                                on_step(prev_node, "finish", state)
-                            except Exception:
-                                pass
-
-                        # Determine routing
-                        if current_node in self.parent.conditional_edges:
-                            router_fn, path_map = self.parent.conditional_edges[current_node]
-                            target = router_fn(state)
-                            resolved = path_map.get(target, target)
-                            current_node = resolved
-                        elif current_node in self.parent.edges:
-                            current_node = self.parent.edges[current_node]
-                        else:
-                            current_node = None
-
-                        state["_next_node"] = current_node
-
-                        # Record node transition telemetry and save checkpoint
-                        diff_val = state.get("diff_summary") if prev_node == "coder" else None
-                        tracker.record_transition(
-                            from_node=prev_node,
-                            to_node=str(current_node),
-                            diff=diff_val,
-                            metadata={"step": steps, "status": state.get("status")}
+                # Resume from checkpointer if existing state is stored
+                state = dict(initial_state)
+                if self.checkpointer:
+                    saved = self.checkpointer.get({"configurable": {"thread_id": thread_id}})
+                    if saved:
+                        saved_next = saved.get("_next_node")
+                        is_explicit_resume = bool(
+                            state.get("_resume")
+                            or cfg.get("configurable", {}).get("resume")
                         )
 
-                        if self.checkpointer:
-                            self.checkpointer.put({"configurable": {"thread_id": thread_id}}, state)
+                        # Resume if explicitly requested, or if saved state is in an interrupted/in-flight state
+                        if (saved_next and saved_next != END) or is_explicit_resume:
+                            merged = dict(saved)
+                            for k, v in state.items():
+                                if k == "status" and v in ("in_progress", "initialized") and saved.get("status"):
+                                    continue
+                                if v not in (None, "", [], {}):
+                                    merged[k] = v
+                            state = merged
 
-                    return state
+                state["thread_id"] = thread_id
+                run_id = state.get("run_id") or state.get("session_id") or thread_id
+                active_run_id.set(run_id)
 
-            return CompiledGraph(self, checkpointer, interrupt_before)
+                current_node = state.get("_next_node") or self.parent.entry_point
+                max_steps = 50
+                steps = 0
+
+                tracker = TelemetryTracker.get_tracker(run_id)
+                on_step = cfg.get("on_step")
+
+                while current_node and current_node != END and steps < max_steps:
+                    steps += 1
+
+                    # Human-in-the-Loop Interruption Check
+                    if current_node in self.interrupt_before:
+                        passed_interrupts = state.get("_passed_interrupts", [])
+                        if current_node not in passed_interrupts:
+                            state["_passed_interrupts"] = passed_interrupts + [current_node]
+                            state["_next_node"] = current_node
+                            state["status"] = f"interrupted_before_{current_node}"
+                            if self.checkpointer:
+                                self.checkpointer.put({"configurable": {"thread_id": thread_id}}, state)
+                            tracker.record_transition(
+                                from_node="orchestrator",
+                                to_node=f"interrupt:{current_node}",
+                                metadata={"reason": "HITL gate triggered"}
+                            )
+                            if on_step:
+                                try:
+                                    on_step(current_node, "interrupt", state)
+                                except Exception:
+                                    pass
+                            return state
+
+                    # Notify start
+                    if on_step:
+                        try:
+                            on_step(current_node, "start", state)
+                        except Exception:
+                            pass
+
+                    # Execute node function
+                    fn = self.parent.nodes[current_node]
+                    prev_node = current_node
+                    updates = fn(state)
+                    if updates:
+                        state.update(updates)
+
+                    state["cost_usd"] = tracker.cumulative_cost_usd
+                    state["token_usage"] = {
+                        "prompt_tokens": tracker.total_prompt_tokens,
+                        "completion_tokens": tracker.total_completion_tokens,
+                        "total_tokens": tracker.total_prompt_tokens + tracker.total_completion_tokens
+                    }
+
+                    if on_step:
+                        try:
+                            on_step(prev_node, "finish", state)
+                        except Exception:
+                            pass
+
+                    # Determine routing
+                    if current_node in self.parent.conditional_edges:
+                        router_fn, path_map = self.parent.conditional_edges[current_node]
+                        target = router_fn(state)
+                        resolved = path_map.get(target, target)
+                        current_node = resolved
+                    elif current_node in self.parent.edges:
+                        current_node = self.parent.edges[current_node]
+                    else:
+                        current_node = None
+
+                    state["_next_node"] = current_node
+
+                    # Record node transition telemetry and save checkpoint
+                    diff_val = state.get("diff_summary") if prev_node == "coder" else None
+                    tracker.record_transition(
+                        from_node=prev_node,
+                        to_node=str(current_node),
+                        diff=diff_val,
+                        metadata={"step": steps, "status": state.get("status")}
+                    )
+
+                    if self.checkpointer:
+                        self.checkpointer.put({"configurable": {"thread_id": thread_id}}, state)
+
+                return state
+
+        return CompiledGraph(self, checkpointer, interrupt_before)
 
 # Initialize agent instances
 product_agent = ProductAgent()
