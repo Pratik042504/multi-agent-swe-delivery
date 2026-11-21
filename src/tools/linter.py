@@ -35,13 +35,13 @@ def run_fast_linter(workspace_path: Path, files: Optional[List[str]] = None) -> 
         LinterResult with pass/fail status, detailed diagnostics, and execution duration.
     """
     start_time = time.perf_counter()
-    workspace_path = Path(workspace_path)
+    workspace_path = Path(workspace_path).resolve()
 
     # Determine files to check
     target_paths: List[Path] = []
     if files:
         for rel in files:
-            p = workspace_path / rel
+            p = (workspace_path / rel).resolve()
             if p.exists() and p.suffix == ".py":
                 target_paths.append(p)
     else:
@@ -50,7 +50,7 @@ def run_fast_linter(workspace_path: Path, files: Optional[List[str]] = None) -> 
                 continue
             for f in f_list:
                 if f.endswith(".py"):
-                    target_paths.append(Path(root) / f)
+                    target_paths.append((Path(root) / f).resolve())
 
     if not target_paths:
         elapsed = (time.perf_counter() - start_time) * 1000.0
@@ -66,7 +66,7 @@ def run_fast_linter(workspace_path: Path, files: Optional[List[str]] = None) -> 
     ruff_bin = shutil.which("ruff")
     if ruff_bin:
         try:
-            cmd = [ruff_bin, "check", "--select=E9,F63,F7,F82", "--output-format=json"] + [str(p) for p in target_paths]
+            cmd = [ruff_bin, "check", "--select=E9,F63,F7,F82", "--output-format=json"] + [str(p.resolve()) for p in target_paths]
             proc = subprocess.run(
                 cmd,
                 cwd=str(workspace_path),
