@@ -1,5 +1,5 @@
 # Multi-Agent Software Engineering & Delivery System (MAS-EDS)
-Dependencies and package configuration
+# Dependencies and package configuration
 
 [build-system]
 requires = ["setuptools>=61.0"]
